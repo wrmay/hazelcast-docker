@@ -1,7 +1,10 @@
-FROM alpine:3.17.0
+FROM amazoncorretto:11
+RUN yum group install -y "Development Tools"
+RUN yum install -y python3 python3-devel
+RUN pip3 install protobuf==3.19.6 grpcio==1.48.0 pandas scikit-learn scipy numpy
 
 # Versions of Hazelcast
-ARG HZ_VERSION=5.3.0-SNAPSHOT
+ARG HZ_VERSION=5.2.1
 # Variant - empty for full, "slim" for slim
 ARG HZ_VARIANT=""
 
@@ -26,8 +29,7 @@ EXPOSE 5701
 COPY *.jar get-hz-dist-zip.sh hazelcast-*.zip ${HZ_HOME}/
 
 # Install
-RUN echo "Installing new APK packages" \
-    && apk add --no-cache openjdk11-jre-headless bash curl libxml2-utils zip unzip \
+RUN echo "Installing Hazelcast" \
     && if [[ ! -f ${HZ_HOME}/hazelcast-distribution.zip ]]; then \
        HAZELCAST_ZIP_URL=$(${HZ_HOME}/get-hz-dist-zip.sh); \
        echo "Downloading Hazelcast${HZ_VARIANT} distribution zip from ${HAZELCAST_ZIP_URL}..."; \
@@ -41,15 +43,16 @@ RUN echo "Installing new APK packages" \
     && echo 'hazelcastDownloadId=docker' > "${HZ_HOME}/lib/hazelcast-download.properties" \
     && echo "Granting read permission to ${HZ_HOME}" \
     && chmod -R +r ${HZ_HOME} \
-    && echo "Cleaning APK packages and redundant files/folders" \
-    && apk del libxml2-utils zip unzip \
-    && rm -rf /var/cache/apk/* ${HZ_HOME}/get-hz-dist-zip.sh ${HZ_HOME}/hazelcast-distribution.zip ${HZ_HOME}/tmp
+    && yum clean packages \
+    && rm -rf ${HZ_HOME}/get-hz-dist-zip.sh ${HZ_HOME}/hazelcast-distribution.zip ${HZ_HOME}/tmp
+    
+
 
 COPY log4j2.properties log4j2-json.properties jmx_agent_config.yaml ${HZ_HOME}/config/
 
 WORKDIR ${HZ_HOME}
 
-RUN addgroup -S hazelcast && adduser -S hazelcast -G hazelcast
+RUN groupadd hazelcast && useradd -g hazelcast  hazelcast
 USER hazelcast
 
 # Start Hazelcast server
